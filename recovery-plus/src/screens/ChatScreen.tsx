@@ -111,7 +111,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      
+
       // Auto-scroll to bottom after AI response
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -327,7 +327,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
         </Text>
       </View>
 
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
@@ -436,7 +436,9 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
                 marginLeft: 12,
               }}
             >
-              <Text style={{ fontSize: 16, color: '#FFFFFF', fontWeight: '600' }}>
+              <Text
+                style={{ fontSize: 16, color: '#FFFFFF', fontWeight: '600' }}
+              >
                 ↑
               </Text>
             </Pressable>
