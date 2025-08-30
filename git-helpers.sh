@@ -55,5 +55,30 @@ gstatus() {
     git log --oneline -5
 }
 
+# Notification versions with visual feedback
+gsync-notify() {
+    echo "🔄 Syncing to GitHub..."
+    git add -A
+    git commit -m "Sync: $(date '+%Y-%m-%d %H:%M:%S')"
+    if git push; then
+        echo "✅ Successfully synced to GitHub! 🚀"
+    else
+        echo "❌ Sync failed! Check your connection."
+    fi
+}
+
+gquick-notify() {
+    local message="${1:-Quick save: $(date '+%Y-%m-%d %H:%M:%S')}"
+    echo "🚀 Quick commit: $message"
+    git add -A
+    git commit -m "$message"
+    if git push; then
+        echo "✅ Committed and pushed successfully! 🎉"
+    else
+        echo "❌ Commit/push failed! Check your connection."
+    fi
+}
+
 echo "🔧 Git helpers loaded!"
 echo "Available commands: gsave, gsync, gquick, ghistory, grollback, gstatus"
+echo "📢 Notification versions: gsync-notify, gquick-notify"

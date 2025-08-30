@@ -8,3 +8,5 @@
 If an error doesn't get resolved by the 2nd time, take extra time to thoroughly go through and find the root problem.  Don't assume anything.
 after every step is done, run npm run lint to check for bugs before confirming everything is done.  
 if completed a task in @projectplan.md cross it off as a task so we can keep track of everything done
+if fixing an error, make sure to thoroughly run the issue and make sure the error is actually solved
+
