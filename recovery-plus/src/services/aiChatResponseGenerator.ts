@@ -60,7 +60,7 @@ class AIChatResponseGenerator {
       ]);
 
       if (aiResponse.success) {
-        return this.parseComprehensiveAIResponse(aiResponse.message, userMessage, context);
+        return await this.parseComprehensiveAIResponse(aiResponse.message, userMessage, context);
       } else {
         throw new Error(`AI generation failed: ${aiResponse.error}`);
       }
@@ -256,11 +256,11 @@ Format as JSON:
   /**
    * Parse comprehensive AI response
    */
-  private parseComprehensiveAIResponse(
+  private async parseComprehensiveAIResponse(
     aiResponse: string,
     userMessage: string,
     context: AIChatContext
-  ): AIChatResponse {
+  ): Promise<AIChatResponse> {
     try {
       // Try to parse JSON response
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
@@ -268,9 +268,12 @@ Format as JSON:
         const parsed = JSON.parse(jsonMatch[0]);
         
         // Validate and clean up the response
+        const validQuickReplies = this.validateQuickReplies(parsed.quickReplies);
+        const quickReplies = validQuickReplies || await this.generateDynamicQuickReplies(parsed.message, context);
+        
         const response: AIChatResponse = {
           message: parsed.message || 'I understand what you\'re saying. Let me help you with that.',
-          quickReplies: this.validateQuickReplies(parsed.quickReplies) || await this.generateDynamicQuickReplies(parsed.message, context),
+          quickReplies,
           actionType: this.validateActionType(parsed.actionType),
           tone: this.validateTone(parsed.tone),
           followUpSuggestions: parsed.followUpSuggestions || [],

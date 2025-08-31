@@ -37,7 +37,7 @@ export interface ChatResponse {
   message: string;
   exerciseRecommendations?: ExerciseRecommendation[];
   quickReplies?: string[];
-  actionType?: 'exercise_suggestion' | 'phase_assessment' | 'general_chat';
+  actionType?: 'exercise_suggestion' | 'phase_assessment' | 'general_chat' | 'motivational' | 'educational';
 }
 
 class ChatService {

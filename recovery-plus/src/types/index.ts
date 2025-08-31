@@ -55,7 +55,7 @@ export interface Exercise {
   // Classification
   level: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
   difficulty: 1 | 2 | 3 | 4 | 5;
-  type: 'strength' | 'mobility' | 'isometric' | 'cardio';
+  type: 'strength' | 'mobility' | 'isometric' | 'cardio' | 'relaxation' | 'balance';
   category?: string;
 
   // Body targeting

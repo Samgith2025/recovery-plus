@@ -34,7 +34,7 @@ export interface ExerciseGenerationContext {
   progressTrend?: 'improving' | 'stable' | 'declining';
 }
 
-export interface AIGeneratedExercise extends Omit<Exercise, 'id' | 'videoUrls'> {
+export interface AIGeneratedExercise extends Omit<Exercise, 'videoUrls'> {
   aiGenerated: true;
   generationReason: string;
   adaptations: string[];
