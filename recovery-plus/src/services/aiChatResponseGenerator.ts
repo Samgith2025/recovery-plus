@@ -261,9 +261,16 @@ Format as JSON:
     userMessage: string,
     context: AIChatContext
   ): Promise<AIChatResponse> {
+    // Ensure aiResponse is a string
+    const responseText = typeof aiResponse === 'string' ? aiResponse : JSON.stringify(aiResponse);
+    
+    if (!responseText) {
+      return this.createFallbackResponse('', userMessage, context);
+    }
+
     try {
       // Try to parse JSON response
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         
@@ -298,7 +305,7 @@ Format as JSON:
     }
 
     // Fallback parsing for non-JSON responses
-    return this.createFallbackResponse(aiResponse, userMessage, context);
+    return this.createFallbackResponse(responseText, userMessage, context);
   }
 
   /**

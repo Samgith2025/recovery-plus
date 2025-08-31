@@ -359,9 +359,28 @@ USER PROFILE:
    */
   private parseExerciseArray(aiResponse: string): Omit<AIGeneratedExercise, 'id' | 'videoUrls' | 'aiGenerated'>[] {
     try {
+      // Handle case where aiResponse might be undefined or not a string
+      if (!aiResponse || typeof aiResponse !== 'string') {
+        console.warn('Invalid AI response received for exercise parsing');
+        return [];
+      }
+
+      // Try to extract JSON array from response
       const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const exercises = JSON.parse(jsonMatch[0]);
+      if (jsonMatch && jsonMatch[0]) {
+        const jsonString = jsonMatch[0].trim();
+        if (jsonString.length === 0) {
+          console.warn('Empty JSON string found in AI response');
+          return [];
+        }
+
+        const exercises = JSON.parse(jsonString);
+        
+        if (!Array.isArray(exercises)) {
+          console.warn('AI response is not an array:', exercises);
+          return [];
+        }
+
         return exercises.map((ex: any) => ({
           name: ex.name || 'Unknown Exercise',
           description: ex.description || 'AI-generated exercise',
@@ -386,12 +405,15 @@ USER PROFILE:
           focusAreas: ex.focusAreas || ex.bodyPart || ['general'],
           estimatedCalories: ex.estimatedCalories || this.estimateCalories(ex),
         }));
+      } else {
+        console.warn('No JSON array found in AI response:', aiResponse?.substring(0, 100));
+        return [];
       }
     } catch (error) {
       console.error('Error parsing exercise array:', error);
+      console.error('AI response content:', aiResponse?.substring(0, 200));
+      return [];
     }
-
-    return [];
   }
 
   /**
