@@ -340,68 +340,147 @@ Please recommend the best exercises for this user's current needs and recovery s
   }
 
   /**
-   * Fallback recommendations when no database or AI is available
+   * AI-powered fallback recommendations when primary AI service is unavailable
    */
   private async getFallbackRecommendations(
     userContext: UserContext,
     limit: number
   ): Promise<ExerciseRecommendation[]> {
-    // Use the hardcoded exercises as fallback
-    const fallbackExercises: Exercise[] = [
-      {
-        id: 'fallback-1',
-        name: 'Gentle Neck Rolls',
-        description: 'Basic neck mobility exercise',
-        instructions: [
-          'Slowly roll your neck in circles',
-          'Change direction after 5 rolls',
-        ],
-        sets: 2,
-        reps: 5,
-        holdTime: 2,
-        restTime: 30,
-        level: 'BEGINNER',
-        difficulty: 1,
-        type: 'mobility',
-        targetMuscles: ['Neck'],
-        bodyPart: ['Neck'],
-        videoUrls: [],
-        icon: '🦴',
-        duration: '3 mins',
+    try {
+      // Use AI Exercise Generator as fallback instead of hardcoded exercises
+      const { aiExerciseGenerator } = await import('./aiExerciseGenerator');
+      
+      const exerciseContext = {
+        painLevel: userContext.painLevel,
+        fitnessLevel: userContext.fitnessLevel,
+        injuryType: userContext.injuryType,
+        bodyParts: userContext.bodyParts,
+        timeAvailable: 15,
+        environment: 'home' as const,
         equipment: [],
-      },
-      {
-        id: 'fallback-2',
-        name: 'Deep Breathing',
-        description: 'Relaxation and stress relief exercise',
-        instructions: [
-          'Breathe in slowly for 4 counts',
-          'Hold for 4 counts',
-          'Exhale for 6 counts',
-        ],
-        sets: 1,
-        reps: 10,
-        holdTime: 4,
-        restTime: 0,
-        level: 'BEGINNER',
-        difficulty: 1,
-        type: 'relaxation',
-        targetMuscles: ['Core'],
-        bodyPart: ['Core'],
-        videoUrls: [],
-        icon: '🫁',
-        duration: '5 mins',
-        equipment: [],
-      },
-    ];
+      };
 
-    return fallbackExercises.slice(0, limit).map(exercise => ({
-      exercise,
-      reason: 'Safe fallback recommendation',
-      aiConfidence: 0.5,
-      personalizedInstructions: exercise.instructions,
-      modifications: ['Listen to your body and stop if you feel pain'],
-    }));
+      const result = await aiExerciseGenerator.generateExercises({
+        context: exerciseContext,
+        count: limit,
+        sessionType: 'recovery',
+        difficulty: 'auto',
+      });
+
+      return result.exercises.map(exercise => ({
+        exercise: {
+          id: exercise.id,
+          name: exercise.name,
+          description: exercise.description,
+          instructions: exercise.instructions,
+          sets: exercise.sets,
+          reps: exercise.reps,
+          holdTime: exercise.holdTime,
+          restTime: exercise.restTime,
+          level: exercise.level,
+          difficulty: exercise.difficulty,
+          type: exercise.type,
+          targetMuscles: exercise.targetMuscles,
+          bodyPart: exercise.bodyPart,
+          videoUrls: [], // Will be populated by video service
+          icon: exercise.icon,
+          duration: exercise.duration,
+          equipment: exercise.equipment,
+        },
+        reason: exercise.generationReason,
+        aiConfidence: result.aiConfidence,
+        personalizedInstructions: exercise.instructions,
+        modifications: exercise.adaptations,
+      }));
+    } catch (error) {
+      console.error('AI fallback generation failed:', error);
+      
+      // Ultimate fallback - minimal safe exercises generated programmatically
+      const safeExercises = this.generateMinimalSafeExercises(userContext, limit);
+      return safeExercises;
+    }
+  }
+
+  /**
+   * Generate minimal safe exercises when all AI services fail
+   */
+  private generateMinimalSafeExercises(
+    userContext: UserContext,
+    limit: number
+  ): ExerciseRecommendation[] {
+    const safeExercises: ExerciseRecommendation[] = [];
+    
+    // Always start with breathing if high pain or stress
+    if (userContext.painLevel && userContext.painLevel > 5) {
+      safeExercises.push({
+        exercise: {
+          id: 'safe-breathing',
+          name: 'Calm Breathing Exercise',
+          description: 'Gentle breathing to reduce tension and promote relaxation',
+          instructions: [
+            'Sit or lie in a comfortable position',
+            'Breathe in slowly through your nose for 4 seconds',
+            'Hold gently for 2 seconds',
+            'Breathe out slowly through your mouth for 6 seconds',
+            'Focus on releasing tension with each exhale'
+          ],
+          sets: 1,
+          reps: 8,
+          holdTime: 2,
+          restTime: 0,
+          level: 'BEGINNER',
+          difficulty: 1,
+          type: 'relaxation',
+          targetMuscles: ['diaphragm'],
+          bodyPart: ['core'],
+          videoUrls: [],
+          icon: '🫁',
+          duration: '4 mins',
+          equipment: [],
+        },
+        reason: 'Safe breathing exercise for pain management',
+        aiConfidence: 0.9,
+        personalizedInstructions: ['Move at your own pace', 'Stop if uncomfortable'],
+        modifications: ['Can be done in any position', 'Adjust timing to comfort'],
+      });
+    }
+
+    // Add gentle movement if space allows
+    if (safeExercises.length < limit) {
+      safeExercises.push({
+        exercise: {
+          id: 'safe-gentle-movement',
+          name: 'Gentle Seated Movements',
+          description: 'Slow, controlled movements to maintain mobility',
+          instructions: [
+            'Sit tall in a sturdy chair',
+            'Slowly roll your shoulders backward 5 times',
+            'Gently turn your head left and right 3 times each',
+            'Lift your arms overhead if comfortable',
+            'Take deep breaths between movements'
+          ],
+          sets: 1,
+          reps: 5,
+          holdTime: 2,
+          restTime: 30,
+          level: 'BEGINNER',
+          difficulty: 1,
+          type: 'mobility',
+          targetMuscles: ['shoulders', 'neck'],
+          bodyPart: ['upper body'],
+          videoUrls: [],
+          icon: '🪑',
+          duration: '5 mins',
+          equipment: ['chair'],
+        },
+        reason: 'Basic mobility maintenance',
+        aiConfidence: 0.8,
+        personalizedInstructions: ['Move slowly and gently', 'Use chair support'],
+        modifications: ['Reduce range if needed', 'Skip any uncomfortable movements'],
+      });
+    }
+
+    return safeExercises.slice(0, limit);
   }
 
   // Helper methods

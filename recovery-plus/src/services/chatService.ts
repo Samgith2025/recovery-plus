@@ -49,75 +49,8 @@ class ChatService {
     content: string;
   }> = [];
 
-  // Sample exercises database (in a real app, this would come from Supabase)
-  private sampleExercises: Exercise[] = [
-    {
-      id: 'ex-1',
-      name: 'Wall Push-ups',
-      description: 'Gentle upper body strength exercise perfect for beginners',
-      instructions: [
-        "Stand arm's length from a wall",
-        'Place palms flat against wall at shoulder height',
-        'Slowly push body toward wall and back',
-        'Keep core engaged throughout movement',
-      ],
-      sets: 2,
-      reps: 8,
-      level: 'BEGINNER',
-      difficulty: 2,
-      type: 'strength',
-      targetMuscles: ['chest', 'shoulders', 'triceps'],
-      bodyPart: ['upper body'],
-      videoUrls: [],
-      icon: '💪',
-      equipment: [],
-      duration: '5 mins',
-    },
-    {
-      id: 'ex-2',
-      name: 'Gentle Cat-Cow Stretch',
-      description: 'Mobility exercise for spine and lower back relief',
-      instructions: [
-        'Start on hands and knees',
-        'Slowly arch back, lifting head and tailbone (Cow)',
-        'Round spine toward ceiling, tucking chin (Cat)',
-        'Move slowly and breathe deeply',
-      ],
-      sets: 1,
-      reps: 10,
-      level: 'BEGINNER',
-      difficulty: 1,
-      type: 'mobility',
-      targetMuscles: ['lower back', 'core'],
-      bodyPart: ['spine', 'lower back'],
-      videoUrls: [],
-      icon: '🐱',
-      equipment: [],
-      duration: '3 mins',
-    },
-    {
-      id: 'ex-3',
-      name: 'Wall Sit',
-      description: 'Isometric exercise for leg strength and endurance',
-      instructions: [
-        'Stand with back against wall',
-        'Slide down until thighs are parallel to floor',
-        'Keep knees at 90-degree angle',
-        'Hold position and breathe normally',
-      ],
-      sets: 3,
-      holdTime: 20,
-      level: 'INTERMEDIATE',
-      difficulty: 3,
-      type: 'isometric',
-      targetMuscles: ['quadriceps', 'glutes'],
-      bodyPart: ['lower body'],
-      videoUrls: [],
-      icon: '🏃',
-      equipment: [],
-      duration: '4 mins',
-    },
-  ];
+  // AI Exercise Generator (replaces hardcoded exercise database)
+  private aiExerciseGenerator = require('./aiExerciseGenerator').aiExerciseGenerator;
 
   async generateResponse(
     userMessage: string,
@@ -215,24 +148,22 @@ IMPORTANT GUIDELINES:
 
 ${contextInfo.length > 0 ? `\nUser Context:\n${contextInfo.join('\n')}` : ''}
 
-Available exercises in the app:
-${this.sampleExercises
-  .map(ex => `- ${ex.name} (${ex.type}, ${ex.level}): ${ex.description}`)
-  .join('\n')}
+EXERCISE RECOMMENDATIONS:
+When users ask for exercises, I will generate personalized recommendations using AI based on their specific needs, injury type, pain level, and fitness level. 
 
 When recommending exercises, use the format:
 **Exercise: [Name]**
 - Level: [Level]
 - Instructions: [Brief instructions]
-- Why: [Why this helps]
-- Video: [Highly specific search terms that exactly match the exercise, like "cat cow stretch proper form tutorial beginner" or "wall push up technique demonstration"]
+- Why: [Why this helps their specific situation]
+- Video: [Highly specific search terms like "exercise name proper form tutorial beginner"]
 
-CRITICAL: Always provide precise video search terms that:
-1. Include the EXACT exercise name
-2. Add technique/form/tutorial keywords
-3. Include difficulty level if relevant
-4. Be specific enough to find the right exercise video
-5. Never use generic terms - be as specific as possible
+CRITICAL: Exercise recommendations should be:
+1. Personalized to the user's condition and capabilities
+2. Safe and appropriate for their pain level
+3. Progressive and achievable
+4. Include specific form cues and safety notes
+5. Provide video search terms that are precise and relevant
 
 Keep responses conversational, helpful, and focused on safe recovery practices.`;
   }
@@ -246,73 +177,55 @@ Keep responses conversational, helpful, and focused on safe recovery practices.`
       actionType: 'general_chat',
     };
 
-    // Check if the AI is recommending exercises
-    const exerciseMatches = aiMessage.match(/\*\*Exercise: ([^*]+)\*\*/g);
+    // Check if AI mentioned exercises and generate AI-powered recommendations
+    const containsExerciseRecommendation = 
+      aiMessage.toLowerCase().includes('exercise') ||
+      aiMessage.toLowerCase().includes('movement') ||
+      aiMessage.toLowerCase().includes('stretch') ||
+      aiMessage.toLowerCase().includes('strengthen') ||
+      aiMessage.match(/\*\*Exercise: [^*]+\*\*/);
 
-    if (exerciseMatches) {
-      response.actionType = 'exercise_suggestion';
-      response.exerciseRecommendations = [];
+    if (containsExerciseRecommendation) {
+      try {
+        // Generate AI exercises based on the conversation context
+        const exerciseContext = {
+          painLevel: context.painLevel,
+          currentPhase: context.currentPhase,
+          recentExercises: context.recentExercises?.map(ex => ex.name) || [],
+          timeAvailable: 15, // Default session time
+          environment: 'home' as const,
+          equipment: [],
+        };
 
-      for (const match of exerciseMatches) {
-        const exerciseName = match
-          .replace(/\*\*Exercise: ([^*]+)\*\*/, '$1')
-          .trim();
-
-        // Extract video search terms from the AI response
-        const exerciseSection =
-          aiMessage.split(match)[1]?.split('**Exercise:')[0] || '';
-        const videoMatch = exerciseSection.match(/- Video: ([^\n]+)/i);
-        const videoSearchTerms = videoMatch ? [videoMatch[1].trim()] : [];
-
-        // Find matching exercise from our database
-        const exercise = this.sampleExercises.find(
-          ex =>
-            ex.name.toLowerCase().includes(exerciseName.toLowerCase()) ||
-            exerciseName.toLowerCase().includes(ex.name.toLowerCase())
+        // Use AI to generate personalized exercises based on the chat
+        const aiExercises = await this.aiExerciseGenerator.generateChatExercises(
+          aiMessage,
+          exerciseContext
         );
 
-        if (exercise) {
-          response.exerciseRecommendations.push({
-            id: exercise.id,
-            name: exercise.name,
-            description: exercise.description,
-            instructions: exercise.instructions,
-            sets: exercise.sets,
-            reps: exercise.reps,
-            holdTime: exercise.holdTime,
-            level: exercise.level,
-            type: exercise.type,
-            targetMuscles: exercise.targetMuscles,
-            reason: 'Recommended by AI coach based on your profile',
-            videoSearchTerms:
-              videoSearchTerms.length > 0
-                ? videoSearchTerms
-                : [exercise.name + ' proper form technique tutorial'],
-          });
-        } else {
-          // Create a new exercise recommendation from AI response
-          response.exerciseRecommendations.push({
-            id: `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            name: exerciseName,
-            description: `AI-recommended exercise for your specific needs`,
-            instructions: [
-              'Follow the video demonstration carefully',
-              'Focus on proper form over speed',
-              'Stop if you feel pain',
-            ],
-            sets: 2,
-            reps: 10,
-            level: 'BEGINNER',
-            type: 'mobility',
-            targetMuscles: ['core', 'back'],
-            reason: 'Recommended by AI coach based on your profile',
-            videoSearchTerms:
-              videoSearchTerms.length > 0
-                ? videoSearchTerms
-                : [exerciseName + ' proper form technique tutorial'],
-          });
+        if (aiExercises.length > 0) {
+          response.actionType = 'exercise_suggestion';
+          response.exerciseRecommendations = aiExercises.map(ex => ({
+            id: ex.id,
+            name: ex.name,
+            description: ex.description,
+            instructions: ex.instructions,
+            sets: ex.sets,
+            reps: ex.reps,
+            holdTime: ex.holdTime,
+            level: ex.level,
+            type: ex.type,
+            targetMuscles: ex.targetMuscles,
+            reason: ex.generationReason,
+            videoSearchTerms: ex.videoSearchTerms,
+          }));
         }
+      } catch (error) {
+        exerciseLogger.warn('Failed to generate AI exercises for chat', { error });
+        // Fallback to simple response without exercise recommendations
+        response.actionType = 'general_chat';
       }
+    }
 
       // Add quick replies for exercise recommendations
       if (response.exerciseRecommendations.length > 0) {

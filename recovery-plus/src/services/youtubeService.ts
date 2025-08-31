@@ -275,62 +275,28 @@ class YouTubeService {
   private generateFallbackVideos(params: VideoSearchParams): YouTubeVideo[] {
     const { exerciseName } = params;
 
-    // Common exercise video IDs for fallback
-    const fallbackVideos: Record<string, string[]> = {
-      'push up': ['IODxDxX7oi4', '_l3ySVKYVJ8'],
-      'wall push-ups': ['IODxDxX7oi4', '_l3ySVKYVJ8'],
-      squat: ['aclHkVaku9U', 'YaXPRqUwItQ'],
-      plank: ['TvxNkmjdhMM', 'pvIjsG5Svck'],
-      burpee: ['dZgVxmf6jVA', 'TU8QYVW0gDU'],
-      lunges: ['3XDriUn0udo', 'MxfTNXSFiYI'],
-      'cat-cow': ['X3-gKhDWmhU', 'QeZwayTELnw'],
-      'cat cow': ['X3-gKhDWmhU', 'QeZwayTELnw'],
-      'gentle cat-cow stretch': ['X3-gKhDWmhU', 'QeZwayTELnw'],
-      'bird dog': ['wiFNA3sqjCA', 'YQf4xuhZIGs'],
-      'dead bug': ['jBpWqaFTu7E', 'AeZOe6zSK1g'],
-      'wall sit': ['y-wV4Venusw', '3QpPMZKHrw4'],
-      'knee to chest': ['bEaWPCrEOv4', 'FmF9f3q7Q8I'],
-      'pelvic tilt': ['yJsxShkxHuE', '1lGfFE3DchU'],
-    };
+    // Generate intelligent search terms for better video results
+    const searchTerms = [
+      `${exerciseName} proper form tutorial`,
+      `${exerciseName} beginner technique`,
+      `how to do ${exerciseName} exercise`,
+      `${exerciseName} step by step guide`
+    ];
 
-    const exerciseKey = exerciseName.toLowerCase();
+    // Create educational placeholder videos that redirect to search
+    videoLogger.info('Generating intelligent video fallbacks', {
+      exerciseName,
+      searchTerms: searchTerms.length,
+    });
 
-    // Try direct match first
-    let videoIds = fallbackVideos[exerciseKey];
-
-    // If no direct match, try partial matches
-    if (!videoIds) {
-      for (const [key, videos] of Object.entries(fallbackVideos)) {
-        if (exerciseKey.includes(key) || key.includes(exerciseKey)) {
-          videoIds = videos;
-          break;
-        }
-      }
-    }
-
-    // Default to a basic stretching video instead of push-ups
-    if (!videoIds) {
-      videoIds = ['X3-gKhDWmhU', 'QeZwayTELnw']; // Cat-cow stretch as default
-      videoLogger.info('Using default fallback videos for exercise', {
-        exerciseName,
-        exerciseKey,
-      });
-    } else {
-      videoLogger.info('Found fallback videos for exercise', {
-        exerciseName,
-        exerciseKey,
-        videoCount: videoIds.length,
-      });
-    }
-
-    return videoIds.map((videoId, index) => ({
-      id: videoId,
-      title: `${exerciseName} - Exercise Tutorial ${index + 1}`,
-      thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
-      duration: '5:00',
-      channelTitle: 'Fitness Channel',
-      embedUrl: this.getEmbedUrl(videoId),
-      fallbackUrl: `https://youtube.com/watch?v=${videoId}`,
+    return searchTerms.slice(0, 2).map((searchTerm, index) => ({
+      id: `fallback_${exerciseName.replace(/\s+/g, '_')}_${index}`,
+      title: `${exerciseName} - ${index === 0 ? 'Proper Form Tutorial' : 'Beginner Guide'}`,
+      thumbnail: `https://via.placeholder.com/320x180/4f46e5/ffffff?text=${encodeURIComponent('Video Tutorial')}`,
+      duration: 'Search Required',
+      channelTitle: 'Exercise Education',
+      embedUrl: '', // No embed for fallback
+      fallbackUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(searchTerm)}`,
     }));
   }
 
