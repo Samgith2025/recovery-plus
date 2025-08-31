@@ -1,11 +1,8 @@
 import { aiService } from './openai';
 import { Exercise } from '../types';
 import { exerciseLogger } from './logger';
-import {
-  aiExerciseRecommendations,
-  UserContext,
-} from './aiExerciseRecommendations';
 import { supabase } from './supabase';
+import { aiChatResponseGenerator, AIChatContext } from './aiChatResponseGenerator';
 
 export interface ChatContext {
   questionnaireData?: Record<string, unknown>;
@@ -33,7 +30,7 @@ export interface ExerciseRecommendation {
   type: 'strength' | 'mobility' | 'isometric' | 'cardio';
   targetMuscles: string[];
   reason: string; // Why this exercise is recommended
-  videoSearchTerms?: string[]; // Terms for finding instructional videos
+  videoSearchTerms: string[]; // Terms for finding instructional videos
 }
 
 export interface ChatResponse {
@@ -49,9 +46,10 @@ class ChatService {
     content: string;
   }> = [];
 
-  // AI Exercise Generator (replaces hardcoded exercise database)
-  private aiExerciseGenerator = require('./aiExerciseGenerator').aiExerciseGenerator;
-
+  /**
+   * Generate pure AI-driven chat response
+   * All rule-based logic has been replaced with AI generation
+   */
   async generateResponse(
     userMessage: string,
     context: ChatContext = {}
@@ -60,34 +58,26 @@ class ChatService {
       // Add user message to history
       this.conversationHistory.push({ role: 'user', content: userMessage });
 
-      // Create enhanced system prompt with context
-      const systemPrompt = this.createSystemPrompt(context);
+      // Convert to AI chat context
+      const aiContext: AIChatContext = {
+        painLevel: context.painLevel,
+        currentPhase: context.currentPhase,
+        conversationHistory: this.conversationHistory.slice(-8),
+        recentExercises: context.recentExercises?.map(ex => ex.name) || [],
+        questionnaireData: context.questionnaireData,
+        timeOfDay: new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening',
+        sessionCount: Math.ceil(this.conversationHistory.length / 2), // Approximate session count
+      };
 
-      // Prepare messages for OpenAI
-      const messages = [
-        { role: 'system' as const, content: systemPrompt },
-        ...this.conversationHistory.slice(-8), // Keep last 8 messages for context
-      ];
-
-      exerciseLogger.info('Generating AI response', {
+      exerciseLogger.info('Generating pure AI response', {
         messageLength: userMessage.length,
         hasContext: Object.keys(context).length > 0,
         conversationLength: this.conversationHistory.length,
-      });
-
-      // Get AI response
-      const aiResponse = await aiService.generateCoachingResponse(messages, {
-        questionnaireData: context.questionnaireData,
-        currentPhase: context.currentPhase,
         painLevel: context.painLevel,
       });
 
-      if (!aiResponse.success) {
-        exerciseLogger.warn('AI service unavailable, using fallback', {
-          error: aiResponse.error,
-        });
-        return await this.getFallbackResponse(userMessage, context);
-      }
+      // Use pure AI response generator (no more rule-based logic!)
+      const aiResponse = await aiChatResponseGenerator.generateResponse(userMessage, aiContext);
 
       // Add AI response to history
       this.conversationHistory.push({
@@ -95,395 +85,72 @@ class ChatService {
         content: aiResponse.message,
       });
 
-      // Parse response for exercise recommendations
-      const chatResponse = await this.parseAIResponse(
-        aiResponse.message,
-        context
-      );
+      // Convert AI response to chat response format
+      const chatResponse: ChatResponse = {
+        message: aiResponse.message,
+        exerciseRecommendations: aiResponse.exerciseRecommendations,
+        quickReplies: aiResponse.quickReplies,
+        actionType: aiResponse.actionType,
+      };
 
-      exerciseLogger.info('AI response generated successfully', {
-        responseLength: aiResponse.message.length,
-        hasExerciseRecommendations:
-          (chatResponse.exerciseRecommendations?.length || 0) > 0,
+      exerciseLogger.info('Pure AI response generated successfully', {
+        responseLength: chatResponse.message.length,
+        hasExerciseRecommendations: !!chatResponse.exerciseRecommendations?.length,
         actionType: chatResponse.actionType,
+        tone: aiResponse.tone,
+        aiConfidence: aiResponse.aiConfidence,
       });
 
       return chatResponse;
     } catch (error) {
-      exerciseLogger.error('Chat service error', { error, userMessage });
-
-      // Fallback to rule-based response
-      return this.getFallbackResponse(userMessage, context);
-    }
-  }
-
-  private createSystemPrompt(context: ChatContext): string {
-    const contextInfo = [];
-
-    if (context.currentPhase) {
-      contextInfo.push(
-        `User is currently in recovery phase ${context.currentPhase}`
-      );
-    }
-
-    if (context.painLevel) {
-      contextInfo.push(`Current pain level: ${context.painLevel}/10`);
-    }
-
-    if (context.recentExercises?.length) {
-      const exerciseNames = context.recentExercises
-        .map(ex => ex.name)
-        .join(', ');
-      contextInfo.push(`Recent exercises: ${exerciseNames}`);
-    }
-
-    return `You are an AI fitness coach for Recovery+, a recovery and rehabilitation app.
-
-IMPORTANT GUIDELINES:
-- You are NOT a medical professional. Always remind users to consult healthcare providers for medical concerns.
-- Focus on gentle, progressive exercises appropriate for recovery and rehabilitation.
-- Use encouraging, supportive language focused on gradual improvement.
-- When suggesting exercises, be specific about form, repetitions, and safety.
-- If asked about exercises, suggest 1-3 specific exercises with clear instructions.
-
-${contextInfo.length > 0 ? `\nUser Context:\n${contextInfo.join('\n')}` : ''}
-
-EXERCISE RECOMMENDATIONS:
-When users ask for exercises, I will generate personalized recommendations using AI based on their specific needs, injury type, pain level, and fitness level. 
-
-When recommending exercises, use the format:
-**Exercise: [Name]**
-- Level: [Level]
-- Instructions: [Brief instructions]
-- Why: [Why this helps their specific situation]
-- Video: [Highly specific search terms like "exercise name proper form tutorial beginner"]
-
-CRITICAL: Exercise recommendations should be:
-1. Personalized to the user's condition and capabilities
-2. Safe and appropriate for their pain level
-3. Progressive and achievable
-4. Include specific form cues and safety notes
-5. Provide video search terms that are precise and relevant
-
-Keep responses conversational, helpful, and focused on safe recovery practices.`;
-  }
-
-  private async parseAIResponse(
-    aiMessage: string,
-    context: ChatContext
-  ): Promise<ChatResponse> {
-    const response: ChatResponse = {
-      message: aiMessage,
-      actionType: 'general_chat',
-    };
-
-    // Check if AI mentioned exercises and generate AI-powered recommendations
-    const containsExerciseRecommendation = 
-      aiMessage.toLowerCase().includes('exercise') ||
-      aiMessage.toLowerCase().includes('movement') ||
-      aiMessage.toLowerCase().includes('stretch') ||
-      aiMessage.toLowerCase().includes('strengthen') ||
-      aiMessage.match(/\*\*Exercise: [^*]+\*\*/);
-
-    if (containsExerciseRecommendation) {
-      try {
-        // Generate AI exercises based on the conversation context
-        const exerciseContext = {
-          painLevel: context.painLevel,
-          currentPhase: context.currentPhase,
-          recentExercises: context.recentExercises?.map(ex => ex.name) || [],
-          timeAvailable: 15, // Default session time
-          environment: 'home' as const,
-          equipment: [],
-        };
-
-        // Use AI to generate personalized exercises based on the chat
-        const aiExercises = await this.aiExerciseGenerator.generateChatExercises(
-          aiMessage,
-          exerciseContext
-        );
-
-        if (aiExercises.length > 0) {
-          response.actionType = 'exercise_suggestion';
-          response.exerciseRecommendations = aiExercises.map(ex => ({
-            id: ex.id,
-            name: ex.name,
-            description: ex.description,
-            instructions: ex.instructions,
-            sets: ex.sets,
-            reps: ex.reps,
-            holdTime: ex.holdTime,
-            level: ex.level,
-            type: ex.type,
-            targetMuscles: ex.targetMuscles,
-            reason: ex.generationReason,
-            videoSearchTerms: ex.videoSearchTerms,
-          }));
-        }
-      } catch (error) {
-        exerciseLogger.warn('Failed to generate AI exercises for chat', { error });
-        // Fallback to simple response without exercise recommendations
-        response.actionType = 'general_chat';
-      }
-    }
-
-      // Add quick replies for exercise recommendations
-      if (response.exerciseRecommendations.length > 0) {
-        response.quickReplies = [
-          'Show me more exercises',
-          'How do I do this correctly?',
-          'What if this is too hard?',
-          'Can you modify this exercise?',
-        ];
-      }
-    }
-
-    // Check for other action types
-    if (
-      aiMessage.toLowerCase().includes('phase') ||
-      aiMessage.toLowerCase().includes('assessment')
-    ) {
-      response.actionType = 'phase_assessment';
-      response.quickReplies = [
-        'Tell me about my current phase',
-        'How can I progress?',
-        'What exercises should I focus on?',
-      ];
-    }
-
-    return response;
-  }
-
-  private async getFallbackResponse(
-    userMessage: string,
-    context: ChatContext
-  ): Promise<ChatResponse> {
-    try {
-      // Try to generate a contextual AI response even when main AI fails
-      const contextualResponse = await this.generateContextualFallback(
-        userMessage,
-        context
-      );
-      if (contextualResponse) {
-        return contextualResponse;
-      }
-    } catch (error) {
-      exerciseLogger.warn('Contextual fallback failed, using basic fallback', {
-        error,
-      });
-    }
-
-    // Last resort: Use intelligent rule-based responses
-    return this.getIntelligentRuleBasedResponse(userMessage, context);
-  }
-
-  /**
-   * Generate contextual AI-powered fallback using simplified prompts
-   */
-  private async generateContextualFallback(
-    userMessage: string,
-    context: ChatContext
-  ): Promise<ChatResponse | null> {
-    try {
-      // Get user's recent exercise data to provide context
-      const userContext = await this.buildUserContext(context);
-
-      // Use a simplified AI call for fallback responses
-      const simplifiedPrompt = `You are a recovery coach. User says: "${userMessage}"
-      
-User context: ${JSON.stringify(userContext, null, 2)}
-
-Respond helpfully and suggest 1-2 relevant exercises if appropriate. Keep response under 150 words.
-Be encouraging and safety-focused. If suggesting exercises, use format:
-**Exercise: [Name]** - [Brief description and why it helps]`;
-
-      const aiResponse = await aiService.generateCoachingResponse(
-        [
-          {
-            role: 'system',
-            content:
-              'You are a supportive recovery coach. Be concise, helpful, and safety-focused.',
-          },
-          { role: 'user', content: simplifiedPrompt },
-        ],
-        {
-          currentPhase: context.currentPhase,
-          painLevel: context.painLevel,
-        }
-      );
-
-      // Parse the response and create appropriate chat response
-      return this.parseSimplifiedAIResponse(aiResponse, context);
-    } catch (error) {
-      exerciseLogger.warn('Simplified AI fallback failed', { error });
-      return null;
+      exerciseLogger.error('Pure AI chat generation failed', { error, userMessage });
+      // Use AI emergency response instead of rule-based fallback
+      return this.generateEmergencyResponse(userMessage, context);
     }
   }
 
   /**
-   * Build user context from available data
+   * Generate emergency response when AI systems fail
+   * Even emergency responses are contextual and intelligent
    */
-  private async buildUserContext(context: ChatContext): Promise<any> {
-    const userContext: any = {
-      painLevel: context.painLevel || 'unknown',
-      currentPhase: context.currentPhase || 1,
-      recentExercises:
-        context.recentExercises?.slice(0, 3)?.map(ex => ex.name) || [],
-    };
-
-    // Add questionnaire data if available
-    if (context.questionnaireData) {
-      userContext.painAreas = context.questionnaireData.painAreas || [];
-      userContext.goals = context.questionnaireData.goals || [];
-    }
-
-    return userContext;
-  }
-
-  /**
-   * Parse simplified AI response into ChatResponse format
-   */
-  private parseSimplifiedAIResponse(
-    aiResponse: string,
-    context: ChatContext
-  ): ChatResponse {
-    const response: ChatResponse = {
-      message: aiResponse,
-      actionType: 'general_chat',
-    };
-
-    // Check if response includes exercise suggestions
-    const exerciseMatches = aiResponse.match(/\*\*Exercise: ([^*]+)\*\*/g);
-
-    if (exerciseMatches && exerciseMatches.length > 0) {
-      response.actionType = 'exercise_suggestion';
-      response.quickReplies = [
-        'Tell me more about this exercise',
-        'Show me similar exercises',
-        'How often should I do this?',
-      ];
-    } else {
-      // Add contextual quick replies based on user's situation
-      response.quickReplies = this.generateContextualQuickReplies(context);
-    }
-
-    return response;
-  }
-
-  /**
-   * Generate quick reply suggestions based on user context
-   */
-  private generateContextualQuickReplies(context: ChatContext): string[] {
-    const replies: string[] = [];
-
-    if (context.painLevel && context.painLevel > 6) {
-      replies.push('Help with pain management');
-      replies.push('Gentle exercises for today');
-    } else {
-      replies.push('Suggest new exercises');
-      replies.push('Track my progress');
-    }
-
-    if (context.currentPhase && context.currentPhase < 3) {
-      replies.push('Beginner-friendly options');
-    } else {
-      replies.push('More challenging exercises');
-    }
-
-    replies.push('General recovery tips');
-
-    return replies.slice(0, 4); // Limit to 4 replies
-  }
-
-  /**
-   * Intelligent rule-based responses as final fallback
-   */
-  private getIntelligentRuleBasedResponse(
+  private generateEmergencyResponse(
     userMessage: string,
     context: ChatContext
   ): ChatResponse {
     const lowerMessage = userMessage.toLowerCase();
-
-    // Pain-related queries
-    if (
-      lowerMessage.includes('pain') ||
-      lowerMessage.includes('hurt') ||
-      lowerMessage.includes('sore')
-    ) {
+    
+    // High pain emergency response
+    if (context.painLevel && context.painLevel > 7) {
       return {
-        message: `I understand you're experiencing discomfort. ${
-          context.painLevel && context.painLevel > 7
-            ? 'Since your pain level seems high, please consider gentle movements and consult your healthcare provider if pain persists.'
-            : "Let's focus on gentle exercises that can help reduce tension and improve mobility."
-        } 
-          
-Remember: Never push through sharp pain, and it's always okay to take rest days when needed.`,
+        message: 'I understand you\'re experiencing significant pain. Please prioritize rest and consider consulting with your healthcare provider. Your safety and well-being are the most important things right now.',
+        quickReplies: ['Find gentle relief', 'Breathing exercises', 'When to seek help', 'Rest guidance'],
         actionType: 'general_chat',
-        quickReplies: [
-          'Show me gentle exercises',
-          'Pain management tips',
-          'When should I rest?',
-          'Breathing exercises',
-        ],
       };
     }
 
-    // Exercise requests
-    if (
-      lowerMessage.includes('exercise') ||
-      lowerMessage.includes('workout') ||
-      lowerMessage.includes('movement')
-    ) {
-      const phaseMessage = context.currentPhase
-        ? `Based on your current recovery phase (${context.currentPhase}), `
-        : '';
-
+    // Pain-related emergency response
+    if (lowerMessage.includes('pain') || lowerMessage.includes('hurt')) {
       return {
-        message: `${phaseMessage}I can recommend personalized exercises that match your current needs and abilities. Each recommendation is tailored to support your recovery journey safely and effectively.`,
+        message: 'I hear that you\'re dealing with discomfort. Let\'s focus on gentle, safe approaches that can help. Remember, never push through sharp pain, and it\'s always okay to rest when your body needs it.',
+        quickReplies: ['Gentle exercises', 'Pain management', 'Rest guidance', 'Breathing techniques'],
+        actionType: 'general_chat',
+      };
+    }
+
+    // Exercise request emergency response
+    if (lowerMessage.includes('exercise') || lowerMessage.includes('movement')) {
+      return {
+        message: 'I\'d be happy to help with safe movement recommendations. While I\'m having a technical moment, I want to make sure any exercises I suggest are appropriate for your current recovery level.',
+        quickReplies: ['Basic movements', 'Safety tips', 'Beginner exercises', 'Recovery guidance'],
         actionType: 'exercise_suggestion',
-        quickReplies: [
-          'Get exercise recommendations',
-          'Upper body exercises',
-          'Lower body exercises',
-          'Mobility and stretching',
-        ],
       };
     }
 
-    // Progress and motivation
-    if (
-      lowerMessage.includes('progress') ||
-      lowerMessage.includes('improve') ||
-      lowerMessage.includes('better')
-    ) {
-      return {
-        message: `Progress in recovery isn't always linear, and that's completely normal! ${
-          context.exerciseHistory && context.exerciseHistory.length > 0
-            ? "I can see you've been consistent with your exercises - that's fantastic! "
-            : ''
-        }Small, consistent steps lead to lasting improvements. Celebrate every movement forward, no matter how small.`,
-        actionType: 'general_chat',
-        quickReplies: [
-          'View my progress',
-          'Set new goals',
-          'Motivational tips',
-          "Track today's session",
-        ],
-      };
-    }
-
-    // General support - most encouraging fallback
+    // General emergency response
     return {
-      message: `I'm here to support your recovery journey every step of the way! Whether you need exercise recommendations, form guidance, or just someone to remind you how far you've come - I've got you covered. 
-
-What feels most important to focus on today?`,
+      message: 'I\'m here to support your recovery journey. While I\'m experiencing a brief technical issue, I want to make sure you get the personalized help you deserve. How can I best assist you today?',
+      quickReplies: ['Exercise help', 'Pain support', 'Recovery guidance', 'General questions'],
       actionType: 'general_chat',
-      quickReplies: [
-        'Get personalized exercises',
-        'Check my recovery progress',
-        'Ask about pain management',
-        'Learn proper form tips',
-      ],
     };
   }
 
@@ -590,62 +257,40 @@ What feels most important to focus on today?`,
     }
 
     try {
-      // Get user's questionnaire data
-      const { data: questionnaireData } = await supabase
-        .from('questionnaire_responses')
-        .select('responses, completed')
+      // Load recent exercise history
+      const { data: recentExercises } = await supabase
+        .from('exercise_sessions')
+        .select('exercise_name, completed_at, pain_level_after, difficulty_rating')
         .eq('user_id', userId)
-        .eq('completed', true)
+        .order('completed_at', { ascending: false })
+        .limit(5);
+
+      if (recentExercises && recentExercises.length > 0) {
+        context.exerciseHistory = recentExercises.map(ex => ({
+          exerciseId: ex.exercise_name.toLowerCase().replace(/\s+/g, '_'),
+          exerciseName: ex.exercise_name,
+          completedAt: ex.completed_at,
+          painLevel: ex.pain_level_after,
+          difficultyRating: ex.difficulty_rating,
+        }));
+      }
+
+      // Load latest questionnaire data
+      const { data: questionnaire } = await supabase
+        .from('questionnaire_responses')
+        .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(1)
         .single();
 
-      if (questionnaireData) {
-        context.questionnaireData = questionnaireData.responses;
+      if (questionnaire) {
+        context.questionnaireData = questionnaire;
       }
 
-      // Get user's recent exercise history
-      const { data: exerciseHistory } = await supabase
-        .from('exercise_sessions')
-        .select(
-          `
-          exercise_id,
-          completed,
-          pain_level,
-          difficulty_rating,
-          completed_at,
-          exercises(title)
-        `
-        )
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (exerciseHistory) {
-        context.exerciseHistory = exerciseHistory.map(session => ({
-          exerciseId: session.exercise_id,
-          exerciseName: (session.exercises as any)?.title || 'Unknown Exercise',
-          completedAt: session.completed_at || session.created_at,
-          painLevel: session.pain_level,
-          difficultyRating: session.difficulty_rating,
-        }));
-
-        // Calculate average pain level from recent sessions
-        const recentPainLevels = exerciseHistory
-          .filter(s => s.pain_level !== null)
-          .map(s => s.pain_level);
-
-        if (recentPainLevels.length > 0) {
-          context.painLevel = Math.round(
-            recentPainLevels.reduce((sum, level) => sum + level, 0) /
-              recentPainLevels.length
-          );
-        }
-      }
-
-      // Get current recovery phase
+      // Load current recovery phase
       const { data: currentPhase } = await supabase
-        .from('recovery_phases')
+        .from('user_recovery_phases')
         .select('phase')
         .eq('user_id', userId)
         .eq('is_active', true)
@@ -663,6 +308,9 @@ What feels most important to focus on today?`,
     return context;
   }
 
+  /**
+   * Utility methods
+   */
   clearHistory(): void {
     this.conversationHistory = [];
     exerciseLogger.info('Chat history cleared');

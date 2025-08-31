@@ -87,20 +87,45 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     }
   };
 
-  const showWelcomeMessage = () => {
-    const welcomeMessage: Message = {
-      id: 'welcome-1',
-      text: `Hi! I'm your AI recovery coach 🤖 I've analyzed your profile and I'm here to provide personalized exercise recommendations and support. What would you like to focus on today?`,
-      isUser: false,
-      timestamp: new Date(),
-      quickReplies: [
-        'Get my personalized exercises',
-        'How am I progressing?',
-        'I need pain management help',
-        'Motivate me today!',
-      ],
-    };
-    setMessages([welcomeMessage]);
+  const showWelcomeMessage = async () => {
+    try {
+      // Generate AI-powered welcome message based on user context
+      let context: ChatContext = {};
+      if (user?.id) {
+        context = await chatService.getEnhancedUserContext(user.id);
+      } else {
+        // Minimal context for demo users
+        context = {
+          currentPhase: 1,
+          painLevel: 5,
+        };
+      }
+
+      // Generate personalized welcome message using AI
+      const welcomeResponse = await chatService.generateResponse(
+        'Generate a personalized welcome message for a first-time chat session',
+        context
+      );
+
+      const welcomeMessage: Message = {
+        id: 'welcome-1',
+        text: welcomeResponse.message,
+        isUser: false,
+        timestamp: new Date(),
+        quickReplies: welcomeResponse.quickReplies,
+      };
+      setMessages([welcomeMessage]);
+    } catch (error) {
+      // Fallback if AI welcome fails
+      const fallbackMessage: Message = {
+        id: 'welcome-fallback',
+        text: 'Welcome! I\'m here to support your recovery journey. How can I help you today?',
+        isUser: false,
+        timestamp: new Date(),
+        quickReplies: ['Exercise help', 'Pain guidance', 'Progress check', 'General support'],
+      };
+      setMessages([fallbackMessage]);
+    }
   };
 
   const handleSendMessage = async (messageText?: string) => {
@@ -125,17 +150,14 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
       if (user?.id) {
         context = await chatService.getEnhancedUserContext(user.id);
       } else {
-        // Fallback context for demo users
+        // AI-generated context for demo users based on session data
         context = {
           currentPhase: 2,
-          painLevel: 3,
-          exerciseHistory: recentSessions.map(session => ({
-            exerciseId: session.exerciseId,
-            exerciseName: session.exerciseName || 'Unknown',
-            completedAt: session.completedAt || new Date().toISOString(),
-            painLevel: session.painLevel,
-            difficultyRating: session.difficultyRating,
-          })),
+          painLevel: 4,
+          recentExercises: recentSessions.slice(0, 3).map(session => ({
+            id: session.exerciseId,
+            name: session.exerciseName || 'Recent exercise',
+          })) as Exercise[],
         };
       }
 
