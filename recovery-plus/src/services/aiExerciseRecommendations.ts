@@ -240,8 +240,15 @@ Please recommend the best exercises for this user's current needs and recovery s
     limit: number
   ): ExerciseRecommendation[] {
     try {
+      // Ensure aiResponse is a string
+      const responseText = typeof aiResponse === 'string' ? aiResponse : JSON.stringify(aiResponse);
+      
+      if (!responseText) {
+        throw new Error('Empty AI response received');
+      }
+
       // Try to extract JSON from AI response
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error('No JSON found in response');
 
       const parsedResponse = JSON.parse(jsonMatch[0]);
