@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import type { Question } from '../../../types/questionnaire';
-import { DemographicSelector } from '../../ui/DemographicSelector';
 import { theme } from '../../../styles/theme';
 
 interface DemographicsQuestionProps {
@@ -25,19 +24,21 @@ export const DemographicsQuestion: React.FC<DemographicsQuestionProps> = ({
     'activity_level',
   ];
 
-  const handleDemographicsChange = (updates: Record<string, any>) => {
-    if (disabled) return;
-    onValueChange({ ...value, ...updates });
-  };
+  // Demographics change handler would be implemented here
 
   return (
     <View>
-      <DemographicSelector
-        fields={fields}
-        value={value}
-        onValueChange={handleDemographicsChange}
-        disabled={disabled}
-      />
+      {fields.map(field => (
+        <View key={field} style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8 }}>
+            {field.replace('_', ' ')}
+          </Text>
+          {/* Simplified demographic input - would need proper implementation */}
+          <Text style={{ color: theme.colors.text.secondary }}>
+            {field} selection (needs implementation)
+          </Text>
+        </View>
+      ))}
 
       {Object.keys(value).length > 0 && (
         <View

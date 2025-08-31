@@ -79,7 +79,7 @@ const PAIN_SCALE_CONFIG = [
 ];
 
 export const PainScaleQuestion: React.FC<PainScaleQuestionProps> = ({
-  question,
+  question: _question,
   value,
   onValueChange,
   disabled = false,

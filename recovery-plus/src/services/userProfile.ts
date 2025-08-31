@@ -62,7 +62,7 @@ export const userProfileService = {
             }
           : undefined,
       };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to create user profile' };
     }
   },
@@ -94,7 +94,7 @@ export const userProfileService = {
             }
           : undefined,
       };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to get user profile' };
     }
   },
@@ -144,7 +144,7 @@ export const userProfileService = {
             }
           : undefined,
       };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to update user profile' };
     }
   },
@@ -163,7 +163,7 @@ export const userProfileService = {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to delete user profile' };
     }
   },
@@ -182,7 +182,7 @@ export const userProfileService = {
       }
 
       return { success: true };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to create user preferences' };
     }
   },
@@ -216,7 +216,7 @@ export const userProfileService = {
             }
           : undefined,
       };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to get user preferences' };
     }
   },
@@ -270,7 +270,7 @@ export const userProfileService = {
             }
           : undefined,
       };
-    } catch (error) {
+    } catch {
       return { success: false, error: 'Failed to update user preferences' };
     }
   },

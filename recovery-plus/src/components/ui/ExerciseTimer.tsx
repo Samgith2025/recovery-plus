@@ -29,7 +29,7 @@ export const ExerciseTimer: React.FC<ExerciseTimerProps> = ({
 }) => {
   const [remainingTime, setRemainingTime] = useState(duration);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Use holdTime if provided and type is hold
   const targetTime = type === 'hold' && holdTime ? holdTime : duration;

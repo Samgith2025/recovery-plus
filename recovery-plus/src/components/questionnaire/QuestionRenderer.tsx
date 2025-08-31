@@ -1,9 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import type {
-  Question,
-  QuestionnaireResponse,
-} from '../../types/questionnaire';
+import type { Question } from '../../types/questionnaire';
 import { theme } from '../../styles/theme';
 
 // Individual question components
@@ -17,10 +14,18 @@ import { BooleanQuestion } from './questions/BooleanQuestion';
 import { BodyAreasQuestion } from './questions/BodyAreasQuestion';
 import { DemographicsQuestion } from './questions/DemographicsQuestion';
 
+type QuestionValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | number[]
+  | { [key: string]: any };
+
 interface QuestionRendererProps {
   question: Question;
-  value?: any;
-  onValueChange: (questionId: string, value: any) => void;
+  value?: QuestionValue;
+  onValueChange: (questionId: string, value: QuestionValue) => void;
   error?: string;
   disabled?: boolean;
 }
@@ -32,7 +37,7 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
   error,
   disabled = false,
 }) => {
-  const handleValueChange = (newValue: any) => {
+  const handleValueChange = (newValue: QuestionValue) => {
     onValueChange(question.id, newValue);
   };
 
@@ -82,40 +87,96 @@ export const QuestionRenderer: React.FC<QuestionRendererProps> = ({
   );
 
   const renderQuestionInput = () => {
-    const commonProps = {
-      value,
-      onValueChange: handleValueChange,
-      disabled,
-      question,
-    };
-
     switch (question.type) {
       case 'multiple_choice':
-        return <MultipleChoiceQuestion {...commonProps} />;
+        return (
+          <MultipleChoiceQuestion
+            value={value as string[]}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       case 'single_choice':
-        return <SingleChoiceQuestion {...commonProps} />;
+        return (
+          <SingleChoiceQuestion
+            value={value as string}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       case 'scale':
-        return <ScaleQuestion {...commonProps} />;
+        return (
+          <ScaleQuestion
+            value={value as number}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       case 'pain_scale':
-        return <PainScaleQuestion {...commonProps} />;
+        return (
+          <PainScaleQuestion
+            value={value as number}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       case 'text':
-        return <TextQuestion {...commonProps} />;
+        return (
+          <TextQuestion
+            value={value as string}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       case 'number':
-        return <NumberQuestion {...commonProps} />;
+        return (
+          <NumberQuestion
+            value={value as number}
+            onValueChange={val => handleValueChange(val)}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       case 'boolean':
-        return <BooleanQuestion {...commonProps} />;
+        return (
+          <BooleanQuestion
+            value={value as boolean}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       case 'body_areas':
-        return <BodyAreasQuestion {...commonProps} />;
+        return (
+          <BodyAreasQuestion
+            value={value as string[]}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       case 'demographics':
-        return <DemographicsQuestion {...commonProps} />;
+        return (
+          <DemographicsQuestion
+            value={value as Record<string, any>}
+            onValueChange={handleValueChange}
+            disabled={disabled}
+            question={question}
+          />
+        );
 
       default:
         return (

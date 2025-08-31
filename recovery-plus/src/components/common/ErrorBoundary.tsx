@@ -3,6 +3,9 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { theme } from '../../styles/theme';
 
+// React Native global declaration
+declare const __DEV__: boolean;
+
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
@@ -127,11 +130,11 @@ const DefaultErrorFallback: React.FC<DefaultErrorFallbackProps> = ({
           lineHeight: theme.typography.lineHeight.relaxed,
         }}
       >
-        We're sorry for the inconvenience. The app encountered an unexpected
-        error.
+        We&apos;re sorry for the inconvenience. The app encountered an
+        unexpected error.
       </Text>
 
-      {false && error && (
+      {__DEV__ && error && (
         <View
           style={{
             backgroundColor: theme.colors.gray[100],

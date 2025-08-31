@@ -1,5 +1,8 @@
 // Performance measurement and optimization utilities
 
+// React Native global declaration
+declare const __DEV__: boolean;
+
 export interface PerformanceMetric {
   name: string;
   startTime: number;
@@ -56,7 +59,7 @@ class PerformanceMonitor {
     this.metrics.delete(name);
 
     // Log if in development
-    if (false) {
+    if (__DEV__) {
       console.log(`⏱️ ${name}: ${duration}ms`, metric?.metadata || '');
     }
 
@@ -175,7 +178,7 @@ export const debounce = <T extends (...args: any[]) => void>(
   func: T,
   wait: number
 ): T => {
-  let timeout: NodeJS.Timeout;
+  let timeout: ReturnType<typeof setTimeout>;
 
   return ((...args: any[]) => {
     clearTimeout(timeout);
@@ -201,7 +204,7 @@ export const throttle = <T extends (...args: any[]) => void>(
 
 // Memory usage helper (development only)
 export const logMemoryUsage = (label: string) => {
-  if (false && (global as any).performance?.memory) {
+  if (__DEV__ && (global as any).performance?.memory) {
     const memory = (global as any).performance.memory;
     console.log(`🧠 Memory [${label}]:`, {
       used: `${Math.round(memory.usedJSHeapSize / 1024 / 1024)}MB`,

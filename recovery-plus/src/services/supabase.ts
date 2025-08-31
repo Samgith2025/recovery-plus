@@ -4,21 +4,30 @@ import { Database } from '../types/supabase';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+// Create a mock client if environment variables are missing (for development)
+const createSupabaseClient = () => {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase environment variables missing - using mock client');
+    return null;
+  }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  });
+};
+
+export const supabase = createSupabaseClient();
 
 // Auth helpers
 export const auth = {
   signUp: async (email: string, password: string) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Supabase not configured' } };
+    }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -27,6 +36,9 @@ export const auth = {
   },
 
   signIn: async (email: string, password: string) => {
+    if (!supabase) {
+      return { data: null, error: { message: 'Supabase not configured' } };
+    }
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -35,17 +47,52 @@ export const auth = {
   },
 
   signOut: async () => {
+    if (!supabase) {
+      return { error: { message: 'Supabase not configured' } };
+    }
     const { error } = await supabase.auth.signOut();
     return { error };
   },
 
   getCurrentUser: () => {
+    if (!supabase) {
+      return Promise.resolve({
+        data: { user: null },
+        error: { message: 'Supabase not configured' },
+      });
+    }
     return supabase.auth.getUser();
   },
 
   onAuthStateChange: (callback: (event: string, session: any) => void) => {
+    if (!supabase) {
+      return {
+        data: { subscription: null },
+        error: { message: 'Supabase not configured' },
+      };
+    }
     return supabase.auth.onAuthStateChange(callback);
   },
+};
+
+// Helper function for null supabase client
+const createMockDbResponse = (message = 'Supabase not configured') => {
+  return Promise.resolve({
+    data: null,
+    error: { message, code: 'SUPABASE_NOT_CONFIGURED' },
+  });
+};
+
+// Wrapper function to handle supabase operations safely
+const safeSupabaseOperation = async (operation: () => Promise<any>) => {
+  if (!supabase) {
+    return createMockDbResponse();
+  }
+  try {
+    return await operation();
+  } catch (error) {
+    return { data: null, error };
+  }
 };
 
 // Database helpers
@@ -57,6 +104,8 @@ export const db = {
     firstName?: string,
     lastName?: string
   ) => {
+    if (!supabase) return createMockDbResponse();
+
     const { data, error } = await supabase
       .from('user_profiles')
       .insert({
@@ -73,6 +122,8 @@ export const db = {
   },
 
   getUserProfile: async (userId: string) => {
+    if (!supabase) return createMockDbResponse();
+
     const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
@@ -85,6 +136,8 @@ export const db = {
     userId: string,
     updates: Partial<Database['public']['Tables']['user_profiles']['Update']>
   ) => {
+    if (!supabase) return createMockDbResponse();
+
     const { data, error } = await supabase
       .from('user_profiles')
       .update({

@@ -4,7 +4,6 @@ import { theme } from '../../styles/theme';
 import {
   AdaptationRecommendation,
   ExerciseModification,
-  AdaptedExercise,
 } from '../../services/exerciseAdaptationService';
 import { Exercise } from '../ui/ExerciseCard';
 import { exerciseLogger } from '../../services/logger';
@@ -474,8 +473,8 @@ export const AdaptationRecommendations: React.FC<
             lineHeight: theme.typography.lineHeight.relaxed,
           }}
         >
-          Based on your feedback, we've identified some exercises that could be
-          optimized for better results and comfort.
+          Based on your feedback, we&apos;ve identified some exercises that
+          could be optimized for better results and comfort.
         </Text>
       </View>
 

@@ -173,8 +173,6 @@ export const getSpacingScale = () => {
 
 // Check if device has enough performance for complex animations
 export const hasHighPerformance = () => {
-  const _deviceType = getDeviceType();
-
   // Simplified performance detection
   if (isIOS) {
     const version = getIOSVersion();

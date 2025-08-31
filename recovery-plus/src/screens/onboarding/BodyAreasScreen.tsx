@@ -43,7 +43,7 @@ export const BodyAreasScreen: React.FC = () => {
     });
 
     setCurrentStep(2);
-    navigation.navigate('Assessment', { step: 1 });
+    navigation.navigate('AdaptiveAssessment');
   };
 
   const handleSkip = () => {

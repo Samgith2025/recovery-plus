@@ -14,6 +14,7 @@ import { LoadingScreen } from '../components/common/LoadingScreen';
 import { WelcomeScreen } from '../screens/onboarding/WelcomeScreen';
 import { BodyAreasScreen } from '../screens/onboarding/BodyAreasScreen';
 import { AssessmentScreen } from '../screens/onboarding/AssessmentScreen';
+import { AdaptiveAssessmentScreen } from '../screens/onboarding/AdaptiveAssessmentScreen';
 import { DemographicsScreen } from '../screens/onboarding/DemographicsScreen';
 import { CompletionScreen } from '../screens/onboarding/CompletionScreen';
 
@@ -25,6 +26,7 @@ export type RootStackParamList = {
   Welcome: undefined;
   BodyAreas: undefined;
   Assessment: { step: number };
+  AdaptiveAssessment: undefined;
   Demographics: { step: number };
   Completion: undefined;
 
@@ -130,6 +132,7 @@ export const AppNavigator: React.FC = () => {
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="BodyAreas" component={BodyAreasScreen} />
             <Stack.Screen name="Assessment" component={AssessmentScreen} />
+            <Stack.Screen name="AdaptiveAssessment" component={AdaptiveAssessmentScreen} />
             <Stack.Screen name="Demographics" component={DemographicsScreen} />
             <Stack.Screen name="Completion" component={CompletionScreen} />
           </>

@@ -43,9 +43,8 @@ export const BodyAreasQuestion: React.FC<BodyAreasQuestionProps> = ({
 
       <BodyAreaSelector
         selectedAreas={value}
-        onSelectionChange={handleBodyAreasChange}
+        onSelectionChange={disabled ? () => {} : handleBodyAreasChange}
         maxSelections={maxSelections}
-        disabled={disabled}
       />
 
       {value.length > 0 && (

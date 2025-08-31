@@ -1,5 +1,9 @@
 import { videoLogger } from './logger';
 
+// Use React Native's global fetch and URL polyfill
+declare const fetch: any;
+declare const URLSearchParams: any;
+
 export interface YouTubeVideo {
   id: string;
   title: string;
@@ -269,19 +273,55 @@ class YouTubeService {
    * Generate fallback video suggestions when API is unavailable
    */
   private generateFallbackVideos(params: VideoSearchParams): YouTubeVideo[] {
-    const { exerciseName, level } = params;
+    const { exerciseName } = params;
 
     // Common exercise video IDs for fallback
     const fallbackVideos: Record<string, string[]> = {
       'push up': ['IODxDxX7oi4', '_l3ySVKYVJ8'],
+      'wall push-ups': ['IODxDxX7oi4', '_l3ySVKYVJ8'],
       squat: ['aclHkVaku9U', 'YaXPRqUwItQ'],
       plank: ['TvxNkmjdhMM', 'pvIjsG5Svck'],
       burpee: ['dZgVxmf6jVA', 'TU8QYVW0gDU'],
       lunges: ['3XDriUn0udo', 'MxfTNXSFiYI'],
+      'cat-cow': ['X3-gKhDWmhU', 'QeZwayTELnw'],
+      'cat cow': ['X3-gKhDWmhU', 'QeZwayTELnw'],
+      'gentle cat-cow stretch': ['X3-gKhDWmhU', 'QeZwayTELnw'],
+      'bird dog': ['wiFNA3sqjCA', 'YQf4xuhZIGs'],
+      'dead bug': ['jBpWqaFTu7E', 'AeZOe6zSK1g'],
+      'wall sit': ['y-wV4Venusw', '3QpPMZKHrw4'],
+      'knee to chest': ['bEaWPCrEOv4', 'FmF9f3q7Q8I'],
+      'pelvic tilt': ['yJsxShkxHuE', '1lGfFE3DchU'],
     };
 
     const exerciseKey = exerciseName.toLowerCase();
-    const videoIds = fallbackVideos[exerciseKey] || fallbackVideos['push up'];
+
+    // Try direct match first
+    let videoIds = fallbackVideos[exerciseKey];
+
+    // If no direct match, try partial matches
+    if (!videoIds) {
+      for (const [key, videos] of Object.entries(fallbackVideos)) {
+        if (exerciseKey.includes(key) || key.includes(exerciseKey)) {
+          videoIds = videos;
+          break;
+        }
+      }
+    }
+
+    // Default to a basic stretching video instead of push-ups
+    if (!videoIds) {
+      videoIds = ['X3-gKhDWmhU', 'QeZwayTELnw']; // Cat-cow stretch as default
+      videoLogger.info('Using default fallback videos for exercise', {
+        exerciseName,
+        exerciseKey,
+      });
+    } else {
+      videoLogger.info('Found fallback videos for exercise', {
+        exerciseName,
+        exerciseKey,
+        videoCount: videoIds.length,
+      });
+    }
 
     return videoIds.map((videoId, index) => ({
       id: videoId,

@@ -78,7 +78,7 @@ export const MultipleChoiceQuestion: React.FC<MultipleChoiceQuestionProps> = ({
               opacity: isDisabledOption ? 0.6 : 1,
             }}
             onPress={() => handleOptionPress(option.value.toString())}
-            disabled={isDisabledOption}
+            disabled={Boolean(isDisabledOption)}
           >
             {/* Checkbox indicator */}
             <View

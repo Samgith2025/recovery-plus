@@ -6,103 +6,80 @@ import {
   SafeAreaView,
   StatusBar,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { theme } from '../../styles/theme';
 import { ExerciseCard } from '../../components/ui/ExerciseCard';
 import { Exercise } from '../../types';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
+import {
+  aiExerciseRecommendations,
+  ExerciseRecommendation,
+  UserContext,
+} from '../../services/aiExerciseRecommendations';
 
-// Mock exercise data for testing
-const MOCK_EXERCISES: Exercise[] = [
-  {
-    id: 'ex-1',
-    name: 'Cat-Cow Stretch',
-    description: 'Gentle spinal mobility exercise to improve back flexibility',
-    instructions: [
-      'Start on hands and knees in tabletop position',
-      'Arch your back and lift your head for cow pose',
-      'Round your spine and tuck chin to chest for cat pose',
-      'Alternate slowly between positions',
-    ],
-    sets: 3,
-    reps: 10,
-    holdTime: 2,
-    restTime: 30,
-    level: 'BEGINNER',
-    difficulty: 1,
-    type: 'mobility',
-    targetMuscles: ['Core', 'Back'],
-    bodyPart: ['Spine', 'Core'],
-    videoUrls: [
-      'https://www.youtube.com/watch?v=K9bK0BwKFjs', // Cat Cow exercise
-    ],
-    icon: '🐱',
-    duration: '5 mins',
-    equipment: [],
+// Temporary user context - in production this would come from user store/context
+const getMockUserContext = (): UserContext => ({
+  userId: 'demo-user-123',
+  questionnaireData: {
+    painAreas: ['back', 'neck'],
+    activityLevel: 'sedentary',
+    goals: ['reduce_pain', 'improve_mobility'],
+    currentPhase: 1,
   },
-  {
-    id: 'ex-2',
-    name: 'Bird Dog',
-    description: 'Core stability exercise for back pain relief',
-    instructions: [
-      'Start in tabletop position',
-      'Extend opposite arm and leg',
-      'Hold position maintaining balance',
-      'Return to start and switch sides',
-    ],
-    sets: 3,
-    reps: 8,
-    holdTime: 5,
-    restTime: 45,
-    level: 'INTERMEDIATE',
-    difficulty: 3,
-    type: 'strength',
-    targetMuscles: ['Core', 'Back', 'Glutes'],
-    bodyPart: ['Core', 'Back', 'Hips'],
-    videoUrls: [
-      'https://www.youtube.com/watch?v=wiFNA3sqjCA', // Bird dog exercise
-    ],
-    icon: '🐦',
-    duration: '8 mins',
-    equipment: [],
+  exerciseHistory: {
+    completedExercises: [],
+    avgPainLevel: 5,
+    avgDifficultyRating: 3,
+    recentFeedback: [],
   },
-  {
-    id: 'ex-3',
-    name: 'Dead Bug',
-    description: 'Core strengthening exercise with controlled movement',
-    instructions: [
-      'Lie on back with arms extended toward ceiling',
-      'Bend knees at 90 degrees, shins parallel to floor',
-      'Lower opposite arm and leg slowly',
-      'Return to start and repeat other side',
-    ],
-    sets: 3,
-    reps: 12,
-    holdTime: 3,
-    restTime: 60,
-    level: 'INTERMEDIATE',
-    difficulty: 2,
-    type: 'strength',
-    targetMuscles: ['Core', 'Hip Flexors'],
-    bodyPart: ['Core', 'Hips'],
-    videoUrls: [
-      'https://www.youtube.com/watch?v=hVgSWu6hAyE', // Dead bug exercise
-    ],
-    icon: '🪲',
-    duration: '10 mins',
-    equipment: [],
+  preferences: {
+    maxDifficulty: 3,
+    preferredTypes: ['mobility', 'strength'],
+    timeAvailable: 30,
   },
-];
+});
 
 export const ExercisesScreen: React.FC = () => {
-  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [recommendations, setRecommendations] = useState<
+    ExerciseRecommendation[]
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   useEffect(() => {
-    // Load mock exercises
-    setExercises(MOCK_EXERCISES);
+    loadPersonalizedExercises();
   }, []);
+
+  const loadPersonalizedExercises = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const userContext = getMockUserContext();
+      const { recommendations: aiRecommendations, error: serviceError } =
+        await aiExerciseRecommendations.getPersonalizedRecommendations(
+          userContext,
+          10
+        );
+
+      setRecommendations(aiRecommendations);
+      if (serviceError) {
+        setError(serviceError);
+      }
+    } catch (err) {
+      setError('Failed to load personalized exercises');
+      console.error('Exercise loading error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    loadPersonalizedExercises();
+  };
 
   const handleExercisePress = (exercise: Exercise) => {
     // Navigate to ExerciseDetailScreen
@@ -144,47 +121,198 @@ export const ExercisesScreen: React.FC = () => {
             marginTop: theme.spacing[1],
           }}
         >
-          Tap an exercise to view details and watch videos
+          AI-powered personalized exercises for your recovery
         </Text>
+
+        {/* Refresh Button */}
+        <Pressable
+          onPress={handleRefresh}
+          style={{
+            marginTop: theme.spacing[2],
+            paddingHorizontal: theme.spacing[3],
+            paddingVertical: theme.spacing[1],
+            backgroundColor: theme.colors.primary[100],
+            borderRadius: 20,
+            alignSelf: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: theme.typography.fontSize.xs,
+              color: theme.colors.primary[600],
+              fontWeight: theme.typography.fontWeight.medium,
+            }}
+          >
+            🔄 Refresh Recommendations
+          </Text>
+        </Pressable>
       </View>
 
-      {/* Exercise List */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          padding: theme.spacing[4],
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        {exercises.length > 0 ? (
-          exercises.map(exercise => (
-            <ExerciseCard
-              key={exercise.id}
-              exercise={exercise}
-              onPress={handleExercisePress}
-              showPlayButton={true}
-            />
-          ))
-        ) : (
-          <View
+      {/* Loading State */}
+      {loading && (
+        <View
+          style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        >
+          <ActivityIndicator size="large" color={theme.colors.primary[500]} />
+          <Text
             style={{
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: theme.spacing[8],
+              marginTop: theme.spacing[3],
+              fontSize: theme.typography.fontSize.base,
+              color: theme.colors.text.secondary,
+            }}
+          >
+            Generating your personalized exercises...
+          </Text>
+        </View>
+      )}
+
+      {/* Error State */}
+      {error && !loading && (
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: theme.spacing[4],
+          }}
+        >
+          <Text style={{ fontSize: 40, marginBottom: theme.spacing[3] }}>
+            ⚠️
+          </Text>
+          <Text
+            style={{
+              fontSize: theme.typography.fontSize.base,
+              color: theme.colors.text.primary,
+              textAlign: 'center',
+              marginBottom: theme.spacing[2],
+            }}
+          >
+            Could not load exercises
+          </Text>
+          <Text
+            style={{
+              fontSize: theme.typography.fontSize.sm,
+              color: theme.colors.text.secondary,
+              textAlign: 'center',
+              marginBottom: theme.spacing[4],
+            }}
+          >
+            {error}
+          </Text>
+          <Pressable
+            onPress={handleRefresh}
+            style={{
+              backgroundColor: theme.colors.primary[500],
+              paddingHorizontal: theme.spacing[4],
+              paddingVertical: theme.spacing[2],
+              borderRadius: 8,
             }}
           >
             <Text
               style={{
-                fontSize: theme.typography.fontSize.lg,
-                color: theme.colors.text.secondary,
-                textAlign: 'center',
+                color: 'white',
+                fontSize: theme.typography.fontSize.base,
+                fontWeight: theme.typography.fontWeight.medium,
               }}
             >
-              No exercises available
+              Try Again
             </Text>
-          </View>
-        )}
-      </ScrollView>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Exercise Recommendations List */}
+      {!loading && !error && (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{
+            padding: theme.spacing[4],
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          {recommendations.length > 0 ? (
+            recommendations.map((recommendation, index) => (
+              <View
+                key={recommendation.exercise.id}
+                style={{ marginBottom: theme.spacing[3] }}
+              >
+                <ExerciseCard
+                  exercise={recommendation.exercise}
+                  onPress={handleExercisePress}
+                  showPlayButton={true}
+                />
+
+                {/* AI Recommendation Reason */}
+                <View
+                  style={{
+                    backgroundColor: theme.colors.primary[50],
+                    padding: theme.spacing[2],
+                    borderRadius: 8,
+                    marginTop: theme.spacing[1],
+                    borderLeftWidth: 3,
+                    borderLeftColor: theme.colors.primary[400],
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: theme.typography.fontSize.xs,
+                      color: theme.colors.primary[700],
+                      fontWeight: theme.typography.fontWeight.medium,
+                    }}
+                  >
+                    🤖 AI Coach: {recommendation.reason}
+                  </Text>
+
+                  {/* Show modifications if available */}
+                  {recommendation.modifications.length > 0 && (
+                    <Text
+                      style={{
+                        fontSize: theme.typography.fontSize.xs,
+                        color: theme.colors.primary[600],
+                        marginTop: theme.spacing[1],
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      💡 {recommendation.modifications[0]}
+                    </Text>
+                  )}
+                </View>
+              </View>
+            ))
+          ) : (
+            <View
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: theme.spacing[8],
+              }}
+            >
+              <Text style={{ fontSize: 40, marginBottom: theme.spacing[3] }}>
+                🤖
+              </Text>
+              <Text
+                style={{
+                  fontSize: theme.typography.fontSize.lg,
+                  color: theme.colors.text.secondary,
+                  textAlign: 'center',
+                  marginBottom: theme.spacing[2],
+                }}
+              >
+                No exercises found
+              </Text>
+              <Text
+                style={{
+                  fontSize: theme.typography.fontSize.sm,
+                  color: theme.colors.text.secondary,
+                  textAlign: 'center',
+                }}
+              >
+                Try refreshing to get new recommendations
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 };

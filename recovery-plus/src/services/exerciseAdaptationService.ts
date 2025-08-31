@@ -2,6 +2,10 @@ import { ExerciseFeedback, FeedbackAnalysis } from '../types/feedback';
 import { Exercise } from '../components/ui/ExerciseCard';
 import { exerciseLogger } from './logger';
 import { feedbackService } from './feedbackService';
+import {
+  aiExerciseAdaptation,
+  AdaptationRecommendation as AIAdaptationRecommendation,
+} from './aiExerciseAdaptation';
 
 export interface ExerciseModification {
   type: 'intensity' | 'duration' | 'reps' | 'weight' | 'alternative' | 'rest';
@@ -28,16 +32,176 @@ export interface AdaptationRecommendation {
 
 class ExerciseAdaptationService {
   /**
-   * Analyze feedback and generate exercise adaptations
+   * Analyze feedback and generate exercise adaptations using AI
    */
   async generateAdaptations(
     userId: string,
     exercises: Exercise[]
   ): Promise<AdaptationRecommendation[]> {
     try {
-      const analysis = await feedbackService.generateFeedbackAnalysis(userId);
-      const trends = await feedbackService.getFeedbackTrends(userId);
+      // Use AI-powered adaptation service
+      const exerciseIds = exercises.map(ex => ex.id);
+      const { adaptations, overallAnalysis, error } =
+        await aiExerciseAdaptation.generatePersonalizedAdaptations(
+          userId,
+          exerciseIds
+        );
 
+      if (error && adaptations.length === 0) {
+        // Fallback to rule-based if AI completely fails
+        exerciseLogger.warn('AI adaptations failed, using fallback', { error });
+        return this.generateLegacyAdaptations(userId, exercises);
+      }
+
+      // Convert AI adaptations to legacy format for compatibility
+      const legacyAdaptations: AdaptationRecommendation[] = adaptations.map(
+        aiAdaptation => ({
+          exerciseId: aiAdaptation.exerciseId,
+          exerciseName: aiAdaptation.exerciseName,
+          modifications: aiAdaptation.modifications.map(mod => ({
+            type: this.mapModificationType(mod.type),
+            description: mod.description,
+            reason: mod.reason,
+            priority: mod.priority,
+          })),
+          shouldReplace: aiAdaptation.shouldReplace,
+          alternativeExercise: aiAdaptation.alternativeExercise,
+          reasoning: aiAdaptation.reasoning,
+        })
+      );
+
+      exerciseLogger.info('AI exercise adaptations generated', {
+        userId,
+        recommendationCount: legacyAdaptations.length,
+        exerciseCount: exercises.length,
+        aiConfidence:
+          adaptations.reduce((sum, a) => sum + a.aiConfidence, 0) /
+          Math.max(adaptations.length, 1),
+        overallAnalysis: overallAnalysis.substring(0, 100) + '...', // Log preview
+      });
+
+      // Sort by priority and urgency
+      return legacyAdaptations.sort((a, b) => {
+        const aScore = this.calculatePriorityScore(a);
+        const bScore = this.calculatePriorityScore(b);
+        return bScore - aScore;
+      });
+    } catch (error) {
+      exerciseLogger.error(
+        'Failed to generate AI adaptations, using fallback',
+        {
+          error,
+          userId,
+        }
+      );
+
+      // Fallback to legacy rule-based system
+      return this.generateLegacyAdaptations(userId, exercises);
+    }
+  }
+
+  /**
+   * Map AI modification types to legacy types for compatibility
+   */
+  private mapModificationType(
+    aiType: string
+  ): 'intensity' | 'duration' | 'reps' | 'weight' | 'alternative' | 'rest' {
+    const mapping: Record<string, any> = {
+      intensity: 'intensity',
+      duration: 'duration',
+      reps: 'reps',
+      sets: 'reps', // Map sets to reps for compatibility
+      hold_time: 'duration',
+      rest_time: 'rest',
+      alternative: 'alternative',
+      form_cue: 'intensity', // Map form cues to intensity modifications
+    };
+
+    return mapping[aiType] || 'intensity';
+  }
+
+  /**
+   * Calculate priority score for sorting
+   */
+  private calculatePriorityScore(
+    recommendation: AdaptationRecommendation
+  ): number {
+    let score = 0;
+
+    recommendation.modifications.forEach(mod => {
+      if (mod.priority === 'high') score += 3;
+      else if (mod.priority === 'medium') score += 2;
+      else score += 1;
+    });
+
+    if (recommendation.shouldReplace) score += 5;
+
+    return score;
+  }
+
+  /**
+   * Get AI-powered adaptation analysis with overall insights
+   */
+  async getAdaptationAnalysis(
+    userId: string,
+    exerciseIds?: string[]
+  ): Promise<{
+    adaptations: AdaptationRecommendation[];
+    overallAnalysis: string;
+    aiPowered: boolean;
+    error?: string;
+  }> {
+    try {
+      const { adaptations, overallAnalysis, error } =
+        await aiExerciseAdaptation.generatePersonalizedAdaptations(
+          userId,
+          exerciseIds
+        );
+
+      // Convert to legacy format
+      const legacyAdaptations: AdaptationRecommendation[] = adaptations.map(
+        aiAdaptation => ({
+          exerciseId: aiAdaptation.exerciseId,
+          exerciseName: aiAdaptation.exerciseName,
+          modifications: aiAdaptation.modifications.map(mod => ({
+            type: this.mapModificationType(mod.type),
+            description: mod.description,
+            reason: mod.reason,
+            priority: mod.priority,
+          })),
+          shouldReplace: aiAdaptation.shouldReplace,
+          alternativeExercise: aiAdaptation.alternativeExercise,
+          reasoning: aiAdaptation.reasoning,
+        })
+      );
+
+      return {
+        adaptations: legacyAdaptations,
+        overallAnalysis,
+        aiPowered: !error,
+        error,
+      };
+    } catch (error) {
+      exerciseLogger.warn('Failed to get AI adaptation analysis', { error });
+      return {
+        adaptations: [],
+        overallAnalysis:
+          'Unable to analyze adaptations at this time. Please try again later.',
+        aiPowered: false,
+        error: 'Service unavailable',
+      };
+    }
+  }
+
+  /**
+   * Legacy rule-based adaptation system (fallback)
+   */
+  private async generateLegacyAdaptations(
+    userId: string,
+    exercises: Exercise[]
+  ): Promise<AdaptationRecommendation[]> {
+    try {
+      const analysis = await feedbackService.generateFeedbackAnalysis(userId);
       const recommendations: AdaptationRecommendation[] = [];
 
       for (const exercise of exercises) {
@@ -62,27 +226,10 @@ class ExerciseAdaptationService {
         }
       }
 
-      exerciseLogger.info('Exercise adaptations generated', {
-        userId,
-        recommendationCount: recommendations.length,
-        exerciseCount: exercises.length,
-      });
-
-      return recommendations.sort((a, b) => {
-        const aHighPriority = a.modifications.filter(
-          m => m.priority === 'high'
-        ).length;
-        const bHighPriority = b.modifications.filter(
-          m => m.priority === 'high'
-        ).length;
-        return bHighPriority - aHighPriority;
-      });
+      return recommendations;
     } catch (error) {
-      exerciseLogger.error('Failed to generate exercise adaptations', {
-        error,
-        userId,
-      });
-      throw error;
+      exerciseLogger.error('Legacy adaptations also failed', { error });
+      return [];
     }
   }
 

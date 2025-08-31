@@ -14,7 +14,12 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 // Simple onboarding screens
-function WelcomeScreen({ navigation }: any) {
+interface NavigationProp {
+  navigate: (screen: string) => void;
+  goBack: () => void;
+}
+
+function WelcomeScreen({ navigation }: { navigation: NavigationProp }) {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={{ padding: 20, paddingTop: 80 }}>
@@ -40,8 +45,8 @@ function WelcomeScreen({ navigation }: any) {
               paddingHorizontal: 20,
             }}
           >
-            Your personalized recovery journey starts here. Let's learn about
-            your needs and create a custom plan just for you.
+            Your personalized recovery journey starts here. Let&apos;s learn
+            about your needs and create a custom plan just for you.
           </Text>
         </View>
 
@@ -131,9 +136,8 @@ function WelcomeScreen({ navigation }: any) {
   );
 }
 
-function DemographicsScreen({ navigation }: any) {
+function DemographicsScreen({ navigation }: { navigation: NavigationProp }) {
   const [age, setAge] = useState('');
-  const [gender, setGender] = useState('');
   const [activityLevel, setActivityLevel] = useState('');
 
   return (
@@ -302,7 +306,7 @@ function DemographicsScreen({ navigation }: any) {
   );
 }
 
-function BodyAreasScreen({ navigation }: any) {
+function BodyAreasScreen({ navigation }: { navigation: NavigationProp }) {
   const [selectedAreas, setSelectedAreas] = useState<string[]>([]);
 
   const bodyAreas = [
@@ -338,8 +342,8 @@ function BodyAreasScreen({ navigation }: any) {
             lineHeight: 24,
           }}
         >
-          Select the areas where you're experiencing pain or want to focus on
-          recovery. You can choose multiple areas.
+          Select the areas where you&apos;re experiencing pain or want to focus
+          on recovery. You can choose multiple areas.
         </Text>
 
         <View
@@ -436,7 +440,7 @@ function BodyAreasScreen({ navigation }: any) {
   );
 }
 
-function CompletionScreen({ navigation }: any) {
+function CompletionScreen({ navigation }: { navigation: NavigationProp }) {
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.colors.background }}>
       <View style={{ padding: 20, paddingTop: 80, alignItems: 'center' }}>
@@ -450,7 +454,7 @@ function CompletionScreen({ navigation }: any) {
             marginBottom: 16,
           }}
         >
-          You're All Set!
+          You&apos;re All Set!
         </Text>
         <Text
           style={{
@@ -462,8 +466,8 @@ function CompletionScreen({ navigation }: any) {
             paddingHorizontal: 20,
           }}
         >
-          We've created a personalized recovery plan based on your responses.
-          Ready to start your journey?
+          We&apos;ve created a personalized recovery plan based on your
+          responses. Ready to start your journey?
         </Text>
 
         {/* Plan Summary */}
@@ -589,7 +593,7 @@ function HomeScreen() {
           }}
         >
           <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 10 }}>
-            Today's Progress
+            Today&apos;s Progress
           </Text>
           <View
             style={{ flexDirection: 'row', justifyContent: 'space-between' }}
@@ -668,7 +672,7 @@ function HomeScreen() {
             <Text
               style={{ color: 'white', textAlign: 'center', fontWeight: '600' }}
             >
-              Start Today's Exercises
+              Start Today&apos;s Exercises
             </Text>
           </TouchableOpacity>
 
@@ -1031,7 +1035,7 @@ function OnboardingStack() {
 
 // App Root - determines whether to show onboarding or main app
 function AppRoot() {
-  const [isFirstTime, setIsFirstTime] = useState(true); // In real app, this would check AsyncStorage
+  const [isFirstTime] = useState(true); // In real app, this would check AsyncStorage
 
   useEffect(() => {
     // In a real app, you'd check AsyncStorage to see if user has completed onboarding

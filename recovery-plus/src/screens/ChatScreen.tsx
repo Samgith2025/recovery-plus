@@ -22,6 +22,7 @@ import {
 } from '../services/chatService';
 import { ExerciseRecommendationCard } from '../components/chat/ExerciseRecommendationCard';
 import { Exercise } from '../types';
+import { aiVideoService } from '../services/aiVideoService';
 
 interface Message {
   id: string;
@@ -51,22 +52,56 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
   const { user } = useAppStore();
   const { recentSessions, startSession } = useExerciseStore();
 
-  // Initial welcome message
+  // Load chat history and show welcome message
   useEffect(() => {
+    loadChatHistory();
+  }, [user]);
+
+  const loadChatHistory = async () => {
+    if (!user?.id) {
+      showWelcomeMessage();
+      return;
+    }
+
+    try {
+      const { success, messages: historyMessages } =
+        await chatService.loadChatHistory(user.id);
+
+      if (success && historyMessages && historyMessages.length > 0) {
+        // Convert database messages to UI message format
+        const convertedMessages: Message[] = historyMessages.map(
+          (msg, index) => ({
+            id: `history-${index}`,
+            text: msg.content,
+            isUser: msg.isUser,
+            timestamp: new Date(msg.createdAt),
+          })
+        );
+        setMessages(convertedMessages);
+      } else {
+        showWelcomeMessage();
+      }
+    } catch (error) {
+      chatLogger.warn('Failed to load chat history', { error });
+      showWelcomeMessage();
+    }
+  };
+
+  const showWelcomeMessage = () => {
     const welcomeMessage: Message = {
       id: 'welcome-1',
-      text: 'Hi! I am your AI recovery coach. I can help you find the right exercises for your recovery journey. What would you like to work on today?',
+      text: `Hi! I'm your AI recovery coach 🤖 I've analyzed your profile and I'm here to provide personalized exercise recommendations and support. What would you like to focus on today?`,
       isUser: false,
       timestamp: new Date(),
       quickReplies: [
-        'Suggest exercises for me',
-        'I have lower back pain',
-        'Help with chest exercises',
-        'Show me beginner routines',
+        'Get my personalized exercises',
+        'How am I progressing?',
+        'I need pain management help',
+        'Motivate me today!',
       ],
     };
     setMessages([welcomeMessage]);
-  }, []);
+  };
 
   const handleSendMessage = async (messageText?: string) => {
     const textToSend = messageText || inputText.trim();
@@ -84,22 +119,34 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     setIsLoading(true);
 
     try {
-      const context: ChatContext = {
-        currentPhase: 2,
-        painLevel: 3,
-        exerciseHistory: recentSessions.map(session => ({
-          exerciseId: session.exerciseId,
-          exerciseName: session.exerciseName || 'Unknown',
-          completedAt: session.completedAt || new Date().toISOString(),
-          painLevel: session.painLevel,
-          difficultyRating: session.difficultyRating,
-        })),
-      };
+      let context: ChatContext = {};
 
-      const chatResponse = await chatService.generateResponse(
-        textToSend,
-        context
-      );
+      // Get enhanced user context from database if user is logged in
+      if (user?.id) {
+        context = await chatService.getEnhancedUserContext(user.id);
+      } else {
+        // Fallback context for demo users
+        context = {
+          currentPhase: 2,
+          painLevel: 3,
+          exerciseHistory: recentSessions.map(session => ({
+            exerciseId: session.exerciseId,
+            exerciseName: session.exerciseName || 'Unknown',
+            completedAt: session.completedAt || new Date().toISOString(),
+            painLevel: session.painLevel,
+            difficultyRating: session.difficultyRating,
+          })),
+        };
+      }
+
+      // Use enhanced response generation with persistence if user is logged in
+      const chatResponse = user?.id
+        ? await chatService.generateResponseWithPersistence(
+            textToSend,
+            user.id,
+            context
+          )
+        : await chatService.generateResponse(textToSend, context);
 
       const aiMessage: Message = {
         id: `ai-${Date.now()}`,
@@ -129,21 +176,32 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({
     }
   };
 
-  const handleStartExercise = (recommendation: ExerciseRecommendation) => {
+  const handleStartExercise = async (
+    recommendation: ExerciseRecommendation
+  ) => {
+    // Get AI-curated videos for this exercise
+    const aiVideos = await aiVideoService.getVideosForExercise(recommendation);
+
     const exercise: Exercise = {
       id: recommendation.id,
       name: recommendation.name,
       description: recommendation.description,
       instructions: recommendation.instructions,
-      sets: recommendation.sets,
-      reps: recommendation.reps,
+      sets: recommendation.sets || 2,
+      reps: recommendation.reps || 10,
       holdTime: recommendation.holdTime,
       level: recommendation.level,
       difficulty: 3,
       type: recommendation.type,
       targetMuscles: recommendation.targetMuscles,
       bodyPart: recommendation.targetMuscles,
-      videoUrls: [],
+      videoUrl:
+        aiVideos.length > 0
+          ? `https://www.youtube.com/watch?v=${aiVideos[0].id}`
+          : undefined,
+      videoUrls: aiVideos.map(
+        video => `https://www.youtube.com/watch?v=${video.id}`
+      ),
       icon: '💪',
       equipment: [],
       duration: '5 mins',
